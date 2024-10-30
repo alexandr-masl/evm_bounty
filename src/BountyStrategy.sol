@@ -5,7 +5,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract BountyStrategy is ReentrancyGuard, AccessControl {
-
     bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
 
     /// @notice Struct to hold details of an recipient
@@ -14,6 +13,16 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         Active,
         Executed,
         Rejected
+    }
+
+    enum Status {
+        None,
+        Pending,
+        Accepted,
+        Rejected,
+        Appealed,
+        InReview,
+        Canceled
     }
 
     /// @notice Struct to represent the power of a supplier.
@@ -31,10 +40,27 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         uint256 thresholdPercentage;
     }
 
+    struct OfferedMilestones {
+        Milestone[] milestones;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        mapping(address => uint256) suppliersVotes;
+    }
+
+    struct Milestone {
+        uint256 amountPercentage;
+        string metadata;
+        Status milestoneStatus;
+        string description;
+    }
+
     event Initialized();
+    event MilestonesOffered(uint256 milestonesLength);
 
     Storage public strategyStorage;
     address[] private _suppliersStore;
+    OfferedMilestones public offeredMilestones;
+    Milestone[] public milestones;
     mapping(address => uint256) private _supplierPower;
 
     function initialize(SupplierPower[] memory _projectSuppliers, uint32 _maxRecipients) external virtual {
@@ -66,5 +92,23 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
 
         strategyStorage.currentSupply = strategyStorage.totalSupply;
         strategyStorage.state = StrategyState.Active;
+    }
+
+    function offerMilestones(Milestone[] memory _milestones) external onlyRole(SUPPLIER_ROLE) {
+        require(milestones.length == 0, "MILESTONES_ALREADY_SET");
+
+        // _resetOfferedMilestones();
+
+        for (uint256 i = 0; i < _milestones.length; i++) {
+            offeredMilestones.milestones.push(_milestones[i]);
+        }
+
+        uint256 managerVotingPower = _supplierPower[msg.sender];
+
+        offeredMilestones.suppliersVotes[msg.sender] = managerVotingPower;
+
+        // _reviewOfferedtMilestones(Status.Accepted, managerVotingPower);
+
+        emit MilestonesOffered(_milestones.length);
     }
 }

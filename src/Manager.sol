@@ -56,6 +56,10 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         thresholdPercentage = 70;
     }
 
+    function getBountyStrategy(bytes32 _projectId) public view returns (address) {
+        return projects[_projectId].strategy;
+    }
+
     function getBountyInfo(bytes32 _bountyId)
         external
         view
@@ -104,7 +108,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         return profileId;
     }
 
-    function supplyProject(bytes32 _projectId, uint256 _amount, address _sponsor) external payable nonReentrant {
+    function supplyProject(bytes32 _projectId, uint256 _amount, address _donor) external payable nonReentrant {
         require(
             (projects[_projectId].supply.has + _amount) <= projects[_projectId].supply.need,
             "AMOUNT_IS_BIGGER_THAN_DECLARED_NEEDEDS"
@@ -116,7 +120,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
         require(projects[_projectId].strategy == address(0), "BOUNTY_IS_FULLY_FUNDED");
 
-        SafeTransferLib.safeTransferFrom(projects[_projectId].token, _sponsor, address(this), _amount);
+        SafeTransferLib.safeTransferFrom(projects[_projectId].token, _donor, address(this), _amount);
 
         projects[_projectId].supply.has += _amount;
 
@@ -149,11 +153,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
             BountyStrategy(strategyAddress).initialize(suppliers, 1);
 
-            SafeTransferLib.safeTransfer(
-                projects[_projectId].token, 
-                strategyAddress, 
-                projects[_projectId].supply.need
-            );
+            SafeTransferLib.safeTransfer(projects[_projectId].token, strategyAddress, projects[_projectId].supply.need);
 
             emit ProjectPoolCreated(_projectId);
         }
