@@ -41,14 +41,39 @@ contract ManagerTest is Test {
     function test_registerProject() public {
         vm.startPrank(bountyAdmin);
 
-        uint256 needs = 1000;
+        uint256 needs = 1e18;
         string memory name = "Test Project";
         string memory metadata = "Test Metadata";
 
         bytes32 profileId = manager.registerProject(address(bountyToken), needs, name, metadata);
-        address token = manager.getPoolToken(profileId);
 
+        (address token,,, uint256 need,,,, string memory retMetadata, string memory retName) =
+            manager.getBountyInfo(profileId);
+
+        // Assertions to verify the token and other fields.
         assertEq(token, address(bountyToken), "Token address does not match the expected bounty token address");
+        assertEq(need, needs, "Need amount does not match the expected value");
+        assertEq(retMetadata, metadata, "Metadata does not match the expected metadata");
+        assertEq(retName, name, "Project name does not match the expected name");
+
+        vm.stopPrank();
+    }
+
+    function test_supplyProject() public {
+        vm.startPrank(bountyAdmin);
+
+        uint256 needs = 1e18;
+        string memory name = "Test Project";
+        string memory metadata = "Test Metadata";
+
+        bytes32 profileId = manager.registerProject(address(bountyToken), needs, name, metadata);
+
+        bountyToken.approve(address(manager), 100e18);
+
+        vm.expectEmit(true, true, false, true);
+        emit Manager.ProjectFunded(profileId, 1e18);
+
+        manager.supplyProject(profileId, 1e18, bountyAdmin);
 
         vm.stopPrank();
     }
