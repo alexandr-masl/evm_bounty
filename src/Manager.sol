@@ -42,6 +42,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     event ProjectRegistered(bytes32 profileId, uint256 nonce);
     event ProjectFunded(bytes32 indexed projectId, uint256 amount);
+    event ProjectPoolCreated(bytes32 projectId);
 
     function initialize(address _strategy, address _strategyFactory) public initializer {
         require(!initialized, "Contract instance has already been initialized");
@@ -142,37 +143,19 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
                 managers[i] = (suppliers[i].supplierId);
             }
 
-            projects[_projectId].strategy = strategyFactory.createStrategy(strategy);
+            address strategyAddress = strategyFactory.createStrategy(strategy);
 
-            //     bytes memory encodedInitData = abi.encode(
-            //         BountyStrategy.InitializeData({
-            //             strategyHat: strategyHat,
-            //             projectSuppliers: suppliers,
-            //             hatsContractAddress: hatsContractAddress,
-            //             maxRecipients: 1
-            //         })
-            //     );
+            projects[_projectId].strategy = strategyAddress;
 
-            //     uint256 pool = allo.createPoolWithCustomStrategy(
-            //         _projectId,
-            //         projects[_projectId].strategy,
-            //         encodedInitData,
-            //         projects[_projectId].token,
-            //         0,
-            //         Metadata({
-            //             protocol: 1,
-            //             pointer: "https://github.com/alexandr-masl/web3-crowdfunding-on-allo-V2/blob/main/contracts/BountyStrategy.sol"
-            //         }),
-            //         managers
-            //     );
+            BountyStrategy(strategyAddress).initialize(suppliers, 1);
 
-            //     token.approve(address(allo), projects[_projectId].supply.need);
+            SafeTransferLib.safeTransfer(
+                projects[_projectId].token, 
+                strategyAddress, 
+                projects[_projectId].supply.need
+            );
 
-            //     allo.fundPool(pool, projects[_projectId].supply.need);
-
-            //     projects[_projectId].poolId = pool;
-
-            //     emit ProjectPoolCreated(_projectId, pool);
+            emit ProjectPoolCreated(_projectId);
         }
     }
 
