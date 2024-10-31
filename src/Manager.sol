@@ -45,7 +45,6 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     event ProjectPoolCreated(bytes32 projectId);
     event ProjectSupplyRevoked(bytes32 projectId, address donor, uint256 amount);
     
-
     function initialize(address _strategy, address _strategyFactory) public initializer {
         require(!initialized, "Contract instance has already been initialized");
         initialized = true;
@@ -74,6 +73,13 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     view
     returns (uint256) {
         return managerVotingPower[_bountyId][_manager];
+    }
+
+    function getDonorContribution(bytes32 _bountyId, address _donor)
+    external
+    view
+    returns (uint256) {
+        return donorContribution[_bountyId][_donor];
     }
 
     function getBountyInfo(bytes32 _bountyId)

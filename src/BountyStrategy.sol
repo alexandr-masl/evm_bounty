@@ -4,11 +4,14 @@ pragma solidity ^0.8.24;
 import "forge-std/console.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {IManager} from "./interfaces/IManager.sol";
 import {Manager} from "./Manager.sol";
 
 contract BountyStrategy is ReentrancyGuard, AccessControl {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant DONOR_ROLE = keccak256("DONOR_ROLE");
 
     /// @notice Struct to hold details of an recipient
     enum StrategyState {
@@ -26,6 +29,11 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         Appealed,
         InReview,
         Canceled
+    }
+
+    struct RejectStrategyVotes {
+        uint256 votes;
+        mapping(address => uint256) donorVotes; // Mapping of supplier addresses to their vote counts.
     }
 
     /// @notice Struct to represent the power of a supplier.
@@ -58,6 +66,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
 
     event Initialized();
     event OfferedMilestonesDropped();
+    event ProjectRejected();
 
     /// @notice Emitted when offered milestones are accepted for a recipient.
     event OfferedMilestonesAccepted();
@@ -79,14 +88,21 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     Storage public strategyStorage;
     OfferedMilestones public offeredMilestones;
     Milestone[] public milestones;
+    RejectStrategyVotes public rejectStrategyVotes;
     IManager private manager;
 
     mapping(address => uint256) private _managerVotingPower;
+    mapping(address => uint256) private _donorContributionFraction;
 
     function initialize(address _manager, bytes32 _bountyId) external virtual {
         require(strategyStorage.thresholdPercentage == 0, "ALREADY_INITIALIZED");
         _BountyStrategy_init(_manager, _bountyId);
         emit Initialized();
+    }
+
+    modifier onlyActive {
+        require(strategyStorage.state == StrategyState.Active, "ACTIVE_STATE_REQUIERED");
+        _;
     }
 
     function _BountyStrategy_init(address _manager, bytes32 _bountyId) internal {
@@ -108,10 +124,17 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
             _grantRole(MANAGER_ROLE, bounty.managers[i]);
         }
 
+        for (uint256 i = 0; i < bounty.donors.length; i++) {
+            uint256 donorContribution = manager.getDonorContribution(_bountyId, bounty.donors[i]);
+            _donorContributionFraction[bounty.donors[i]] = (donorContribution * 1e18) / strategyStorage.totalSupply;
+
+            _grantRole(DONOR_ROLE, bounty.donors[i]);
+        }
+
         strategyStorage.state = StrategyState.Active;
     }
 
-    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) {
+    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive(){
 
         for (uint256 i = 0; i < _milestones.length; i++) {
             offeredMilestones.milestones.push(_milestones[i]);
@@ -126,7 +149,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     /// @param _status The new status to be set for the offered milestones.
     /// @dev Requires the sender to be the pool manager and wearing the supplier hat.
     /// Emits a MilestonesReviewed event and, depending on the outcome, either OfferedMilestonesAccepted or OfferedMilestonesRejected.
-    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) {
+    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) onlyActive() {
         require(offeredMilestones.managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
         require(milestones.length == 0, "MILESTONES_ALREADY_SET");
 
@@ -152,6 +175,23 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
 
         emit MilestonesReviewed(_status);
     }
+
+    function rejectStrategy(Status _status) external onlyRole(DONOR_ROLE) onlyActive() {
+        require(_status == Status.Accepted || _status == Status.Rejected, "INVALID_STATUS");
+        require(rejectStrategyVotes.donorVotes[msg.sender] == 0, "ALREADY_REVIEWED");
+
+        uint256 donorContributionFraction = _donorContributionFraction[msg.sender];
+        rejectStrategyVotes.donorVotes[msg.sender]= donorContributionFraction;
+        rejectStrategyVotes.votes += donorContributionFraction;
+
+        if (_checkIfVotesExceedThreshold(rejectStrategyVotes.votes)){
+            _distributeFundsBackToDonors();
+
+            strategyStorage.state = StrategyState.Rejected;
+            emit ProjectRejected();
+        }
+    }   
+
 
     function _setMilestones(Milestone[] memory _milestones) internal {
         uint256 totalAmountPercentage;
@@ -199,5 +239,17 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         delete offeredMilestones;
 
         emit OfferedMilestonesDropped();
+    }
+
+    function _distributeFundsBackToDonors() private {
+
+        for (uint256 i = 0; i < bounty.donors.length; i++) {
+            uint256 fraction = _donorContributionFraction[msg.sender];
+            IERC20 token = IERC20(bounty.token);
+            uint256 tokenBalance = token.balanceOf(address(this));
+            uint256 amount = tokenBalance * fraction / 1e18;
+
+            SafeTransferLib.safeTransfer(bounty.token, bounty.donors[i], amount);
+        }
     }
 }
