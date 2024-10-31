@@ -39,7 +39,6 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         uint256 registeredRecipients;
         uint32 maxRecipientsAmount;
         uint256 totalSupply;
-        uint256 currentSupply;
         uint256 thresholdPercentage;
     }
 
@@ -109,7 +108,6 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
             _grantRole(MANAGER_ROLE, bounty.managers[i]);
         }
 
-        strategyStorage.currentSupply = strategyStorage.totalSupply;
         strategyStorage.state = StrategyState.Active;
     }
 
@@ -120,7 +118,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         }
 
         emit MilestonesOffered(_milestones.length);
-        
+
         reviewOfferedtMilestones(Status.Accepted);
     }
 

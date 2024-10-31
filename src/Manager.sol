@@ -20,6 +20,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         address token;
         address executor;
         address[] managers;
+        address[] donors;
         BountySupply supply;
         uint256 poolId;
         address strategy;
@@ -36,10 +37,14 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     mapping(bytes32 => BountyInformation) public bounties;
     mapping(bytes32 => mapping(address => uint256)) public managerVotingPower;
+    mapping(bytes32 => mapping(address => uint256)) public donorContribution;
+    mapping(bytes32 => mapping(address => address)) public donorToManager;
 
     event ProjectRegistered(bytes32 profileId, uint256 nonce);
     event ProjectFunded(bytes32 indexed projectId, uint256 amount);
     event ProjectPoolCreated(bytes32 projectId);
+    event ProjectSupplyRevoked(bytes32 projectId, address donor, uint256 amount);
+    
 
     function initialize(address _strategy, address _strategyFactory) public initializer {
         require(!initialized, "Contract instance has already been initialized");
@@ -77,7 +82,8 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         returns (
             address _token,
             address _executor,
-            address[] memory _suppliers,
+            address[] memory _managers,
+            address[] memory _donors,
             uint256 _need,
             uint256 _has,
             uint256 _poolId,
@@ -91,6 +97,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
             bounty.token,
             bounty.executor,
             bounty.managers,
+            bounty.donors,
             bounty.supply.need,
             bounty.supply.has,
             bounty.poolId,
@@ -131,7 +138,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
         require(bounties[_projectId].strategy == address(0), "BOUNTY_IS_FULLY_FUNDED");
 
-        SafeTransferLib.safeTransferFrom(bounties[_projectId].token, _donor, address(this), _amount);
+        SafeTransferLib.safeTransferFrom(bounties[_projectId].token, msg.sender, address(this), _amount);
 
         bounties[_projectId].supply.has += _amount;
 
@@ -139,7 +146,13 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
             bounties[_projectId].managers.push(msg.sender);
         }
 
+        if (donorContribution[_projectId][_donor] == 0) {
+            bounties[_projectId].donors.push(_donor);
+        }
+
         managerVotingPower[_projectId][msg.sender] += _amount;
+        donorContribution[_projectId][_donor] += _amount;
+        donorToManager[_projectId][_donor] = msg.sender;
 
         emit ProjectFunded(_projectId, _amount);
 
@@ -151,13 +164,6 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
                 "Insufficient token balance in contract"
             );
 
-            // BountyStrategy.SupplierPower[] memory managers = _extractSupliers(_projectId);
-            // address[] memory managers = new address[](managers.length);
-
-            // for (uint256 i = 0; i < managers.length; i++) {
-            //     managers[i] = (managers[i].supplierId);
-            // }
-
             address strategyAddress = strategyFactory.createStrategy(strategy);
 
             bounties[_projectId].strategy = strategyAddress;
@@ -168,6 +174,49 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
             emit ProjectPoolCreated(_projectId);
         }
+    }
+
+    function revokeProjectSupply(bytes32 _projectId, address _donor) external nonReentrant {
+        require(_projectExists(_projectId), "Project does not exist");
+        require(bounties[_projectId].strategy == address(0), "BOUNTY_IS_MANAGED_BY_THE_STRATEGY");
+
+        require(managerVotingPower[_projectId][msg.sender] != 0 || donorContribution[_projectId][msg.sender] != 0, "UNAUTHORIZED");
+
+        uint256 amount = donorContribution[_projectId][_donor];
+        require(amount > 0, "DONOR NOT FOUND");
+
+        address managerId = donorToManager[_projectId][_donor];
+        delete managerVotingPower[_projectId][managerId];
+
+        delete donorContribution[_projectId][_donor];
+
+        bounties[_projectId].supply.has -= amount;
+
+        address[] memory updatedManagers = new address[](bounties[_projectId].managers.length - 1);
+        uint256 j = 0;
+
+        for (uint256 i = 0; i < bounties[_projectId].managers.length; i++) {
+            if (bounties[_projectId].managers[i] != managerId) {
+                updatedManagers[j] = bounties[_projectId].managers[i];
+                j++;
+            }
+        }
+        bounties[_projectId].managers = updatedManagers;
+
+        address[] memory updatedDonors = new address[](bounties[_projectId].donors.length - 1);
+        uint256 donorIndex = 0;
+
+        for (uint256 i = 0; i < bounties[_projectId].donors.length; i++) {
+            if (bounties[_projectId].donors[i] != _donor) {
+                updatedDonors[donorIndex] = bounties[_projectId].donors[i];
+                donorIndex++;
+            }
+        }
+        bounties[_projectId].donors = updatedDonors;
+
+        SafeTransferLib.safeTransfer(bounties[_projectId].token, _donor, amount);
+
+        emit ProjectSupplyRevoked(_projectId, _donor, amount);
     }
 
     function _extractSupliers(bytes32 _projectId) internal view returns (BountyStrategy.SupplierPower[] memory) {
