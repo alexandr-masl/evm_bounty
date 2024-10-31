@@ -10,7 +10,6 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {BountyStrategy} from "./BountyStrategy.sol";
 
 contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-
     struct BountySupply {
         uint256 need; // The total amount needed for the project.
         uint256 has; // The amount currently supplied.
@@ -44,7 +43,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     event ProjectFunded(bytes32 indexed projectId, uint256 amount);
     event ProjectPoolCreated(bytes32 projectId);
     event ProjectSupplyRevoked(bytes32 projectId, address donor, uint256 amount);
-    
+
     function initialize(address _strategy, address _strategyFactory) public initializer {
         require(!initialized, "Contract instance has already been initialized");
         initialized = true;
@@ -61,24 +60,15 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         return bounties[_projectId].strategy;
     }
 
-    function getBounty(bytes32 _bountyId)
-    external
-    view
-    returns (BountyInformation memory) {
+    function getBounty(bytes32 _bountyId) external view returns (BountyInformation memory) {
         return bounties[_bountyId];
     }
 
-    function getManagerVotingPower(bytes32 _bountyId, address _manager)
-    external
-    view
-    returns (uint256) {
+    function getManagerVotingPower(bytes32 _bountyId, address _manager) external view returns (uint256) {
         return managerVotingPower[_bountyId][_manager];
     }
 
-    function getDonorContribution(bytes32 _bountyId, address _donor)
-    external
-    view
-    returns (uint256) {
+    function getDonorContribution(bytes32 _bountyId, address _donor) external view returns (uint256) {
         return donorContribution[_bountyId][_donor];
     }
 
@@ -186,7 +176,10 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         require(_projectExists(_projectId), "Project does not exist");
         require(bounties[_projectId].strategy == address(0), "BOUNTY_IS_MANAGED_BY_THE_STRATEGY");
 
-        require(managerVotingPower[_projectId][msg.sender] != 0 || donorContribution[_projectId][msg.sender] != 0, "UNAUTHORIZED");
+        require(
+            managerVotingPower[_projectId][msg.sender] != 0 || donorContribution[_projectId][msg.sender] != 0,
+            "UNAUTHORIZED"
+        );
 
         uint256 amount = donorContribution[_projectId][_donor];
         require(amount > 0, "DONOR NOT FOUND");

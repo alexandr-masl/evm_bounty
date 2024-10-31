@@ -133,7 +133,9 @@ contract ManagerTest is Test {
 
         uint256 bountyDonorInitialBalance = bountyToken.balanceOf(bountyDonor);
 
-        console.log("::::::::: test_supplyProjectAndRevokeSupply | bountyDonorInitialBalance:", bountyDonorInitialBalance);
+        console.log(
+            "::::::::: test_supplyProjectAndRevokeSupply | bountyDonorInitialBalance:", bountyDonorInitialBalance
+        );
 
         manager.revokeProjectSupply(profileId, bountyManager);
 
@@ -143,7 +145,8 @@ contract ManagerTest is Test {
         // manager.revokeProjectSupply(profileId, bountyDonor);
 
         uint256 bountyDonorUpdatedBalance = bountyToken.balanceOf(bountyDonor);
-        console.log("::::::::: test_supplyProjectAndRevokeSupply | bountyDonorUpdatedBalance:", bountyDonorUpdatedBalance);
-
+        console.log(
+            "::::::::: test_supplyProjectAndRevokeSupply | bountyDonorUpdatedBalance:", bountyDonorUpdatedBalance
+        );
     }
 }
