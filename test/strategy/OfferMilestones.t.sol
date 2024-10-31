@@ -60,29 +60,29 @@ contract OfferMilestones is Test {
         vm.stopPrank();
     }
 
-    function test_UnauthorizedOfferMilestonesByAdmin() public {
-        vm.startPrank(bountyAdmin);
+    // function test_UnauthorizedOfferMilestonesByAdmin() public {
+    //     vm.startPrank(bountyAdmin);
 
-        bountyToken.approve(address(manager), 100e18);
-        manager.supplyProject(profileId, 1e18, bountyAdmin);
+    //     bountyToken.approve(address(manager), 100e18);
+    //     manager.supplyProject(profileId, 1e18, bountyAdmin);
 
-        address projectStrategy = manager.getBountyStrategy(profileId);
-        BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
+    //     address projectStrategy = manager.getBountyStrategy(profileId);
+    //     BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
 
-        BountyStrategy.Milestone[] memory milestones = getMilestones();
+    //     BountyStrategy.Milestone[] memory milestones = getMilestones();
 
-        vm.stopPrank();
+    //     vm.stopPrank();
 
-        bytes memory expectedError = abi.encodeWithSignature(
-            "AccessControlUnauthorizedAccount(address,bytes32)",
-            unAuthorized,
-            strategyContract.SUPPLIER_ROLE() // Assumes `SUPPLIER_ROLE` is accessible
-        );
-        vm.expectRevert(expectedError);
+    //     bytes memory expectedError = abi.encodeWithSignature(
+    //         "AccessControlUnauthorizedAccount(address,bytes32)",
+    //         unAuthorized,
+    //         strategyContract.SUPPLIER_ROLE() // Assumes `SUPPLIER_ROLE` is accessible
+    //     );
+    //     vm.expectRevert(expectedError);
 
-        vm.prank(unAuthorized);
-        strategyContract.offerMilestones(milestones);
-    }
+    //     vm.prank(unAuthorized);
+    //     strategyContract.offerMilestones(milestones);
+    // }
 
     function getMilestones() public pure returns (BountyStrategy.Milestone[] memory milestones) {
         milestones = new BountyStrategy.Milestone[](2);

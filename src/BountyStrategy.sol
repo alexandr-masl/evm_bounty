@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import "forge-std/console.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IManager} from "./interfaces/IManager.sol";
+import {Manager} from "./Manager.sol";
 
 contract BountyStrategy is ReentrancyGuard, AccessControl {
-    bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     /// @notice Struct to hold details of an recipient
     enum StrategyState {
@@ -44,7 +47,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         Milestone[] milestones;
         uint256 votesFor;
         uint256 votesAgainst;
-        mapping(address => uint256) suppliersVotes;
+        mapping(address => uint256) managersVotes;
     }
 
     struct Milestone {
@@ -55,60 +58,148 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     }
 
     event Initialized();
+    event OfferedMilestonesDropped();
+
+    /// @notice Emitted when offered milestones are accepted for a recipient.
+    event OfferedMilestonesAccepted();
+
+    /// @notice Emitted when offered milestones are rejected for a recipient.
+    event OfferedMilestonesRejected();
+
+    /// @notice Emitted when milestones for a recipient are reviewed.
+    event MilestonesReviewed(Status status);
+
+    /// @notice Emitted when milestones are offered to a recipient.
     event MilestonesOffered(uint256 milestonesLength);
 
+     /// @notice Emitted when milestones are set for a recipient.
+    event MilestonesSet(uint256 milestonesLength);
+
+    Manager.BountyInformation bounty;
+    bytes32 bountyId;
     Storage public strategyStorage;
-    address[] private _suppliersStore;
     OfferedMilestones public offeredMilestones;
     Milestone[] public milestones;
-    mapping(address => uint256) private _supplierPower;
+    IManager private manager;
 
-    function initialize(SupplierPower[] memory _projectSuppliers, uint32 _maxRecipients) external virtual {
+    mapping(address => uint256) private _managerVotingPower;
+
+    function initialize(address _manager, bytes32 _bountyId) external virtual {
         require(strategyStorage.thresholdPercentage == 0, "ALREADY_INITIALIZED");
-        _BountyStrategy_init(_projectSuppliers, _maxRecipients);
+        _BountyStrategy_init(_manager, _bountyId);
         emit Initialized();
     }
 
-    function _BountyStrategy_init(SupplierPower[] memory _projectSuppliers, uint32 _maxRecipients) internal {
+    function _BountyStrategy_init(address _manager, bytes32 _bountyId) internal {
         strategyStorage.thresholdPercentage = 77;
-        strategyStorage.maxRecipientsAmount = _maxRecipients;
+        strategyStorage.maxRecipientsAmount = 1;
+        manager = IManager(_manager);
 
-        SupplierPower[] memory supliersPower = _projectSuppliers;
+        bounty = manager.getBounty(_bountyId);
+        bountyId = _bountyId;
 
-        uint256 totalInvestment = 0;
-        for (uint256 i = 0; i < supliersPower.length; i++) {
-            totalInvestment += supliersPower[i].supplierPower;
+        for (uint256 i = 0; i < bounty.managers.length; i++) {
+            strategyStorage.totalSupply += manager.getManagerVotingPower(_bountyId, bounty.managers[i]);
         }
 
-        for (uint256 i = 0; i < supliersPower.length; i++) {
-            _suppliersStore.push(supliersPower[i].supplierId);
+        for (uint256 i = 0; i < bounty.managers.length; i++) {
+            uint256 votingPower = manager.getManagerVotingPower(_bountyId, bounty.managers[i]);
+            _managerVotingPower[bounty.managers[i]] = (votingPower * 1e18) / strategyStorage.totalSupply;
 
-            // Normalize supplier power to a percentage
-            _supplierPower[supliersPower[i].supplierId] = (supliersPower[i].supplierPower * 1e18) / totalInvestment;
-            strategyStorage.totalSupply += _supplierPower[supliersPower[i].supplierId];
-
-            _grantRole(SUPPLIER_ROLE, supliersPower[i].supplierId);
+            _grantRole(MANAGER_ROLE, bounty.managers[i]);
         }
 
         strategyStorage.currentSupply = strategyStorage.totalSupply;
         strategyStorage.state = StrategyState.Active;
     }
 
-    function offerMilestones(Milestone[] memory _milestones) external onlyRole(SUPPLIER_ROLE) {
-        require(milestones.length == 0, "MILESTONES_ALREADY_SET");
-
-        // _resetOfferedMilestones();
+    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) {
 
         for (uint256 i = 0; i < _milestones.length; i++) {
             offeredMilestones.milestones.push(_milestones[i]);
         }
 
-        uint256 managerVotingPower = _supplierPower[msg.sender];
-
-        offeredMilestones.suppliersVotes[msg.sender] = managerVotingPower;
-
-        // _reviewOfferedtMilestones(Status.Accepted, managerVotingPower);
-
         emit MilestonesOffered(_milestones.length);
+        
+        reviewOfferedtMilestones(Status.Accepted);
+    }
+
+    /// @notice Reviews the offered milestones for a specific recipient and sets their status.
+    /// @param _status The new status to be set for the offered milestones.
+    /// @dev Requires the sender to be the pool manager and wearing the supplier hat.
+    /// Emits a MilestonesReviewed event and, depending on the outcome, either OfferedMilestonesAccepted or OfferedMilestonesRejected.
+    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) {
+        require(offeredMilestones.managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
+        require(milestones.length == 0, "MILESTONES_ALREADY_SET");
+
+        uint256 managerVotingPower = manager.getManagerVotingPower(bountyId, msg.sender);
+        offeredMilestones.managersVotes[msg.sender] = managerVotingPower;
+
+        if (_status == Status.Accepted) {
+            offeredMilestones.votesFor += managerVotingPower;
+
+            if (_checkIfVotesExceedThreshold(offeredMilestones.votesFor)) {
+                _setMilestones(offeredMilestones.milestones);
+                emit OfferedMilestonesAccepted();
+            }
+
+        } else if (_status == Status.Rejected) {
+            offeredMilestones.votesAgainst += managerVotingPower;
+
+            if (_checkIfVotesExceedThreshold(offeredMilestones.votesAgainst)) {
+                _resetOfferedMilestones();
+                emit OfferedMilestonesRejected();
+            }
+        }
+
+        emit MilestonesReviewed(_status);
+    }
+
+    function _setMilestones(Milestone[] memory _milestones) internal {
+        uint256 totalAmountPercentage;
+
+        // Clear out the milestones and reset the index to 0
+        if (milestones.length > 0) {
+            delete milestones;
+        }
+
+        uint256 milestonesLength = _milestones.length;
+
+        // Loop through the milestones and set them
+        for (uint256 i; i < milestonesLength;) {
+            Milestone memory milestone = _milestones[i];
+
+            // Reverts if the milestone status is 'None'
+            require(milestone.milestoneStatus == Status.None, "INVALID_MILESTONE_STATUS");
+
+            // Add the milestone percentage amount to the total percentage amount
+            totalAmountPercentage += milestone.amountPercentage;
+
+            // Add the milestone to the recipient's milestones
+            milestones.push(milestone);
+
+            unchecked {
+                i++;
+            }
+        }
+
+        require(totalAmountPercentage == 1e18, "INVALID_MILESTONES_PERCENTAGE");
+
+        emit MilestonesSet(milestonesLength);
+    }
+
+    function _checkIfVotesExceedThreshold(uint256 _votes) internal view returns (bool) {
+        uint256 thresholdValue = (strategyStorage.totalSupply * strategyStorage.thresholdPercentage) / 100;
+        return _votes > thresholdValue;
+    }
+
+    function _resetOfferedMilestones() internal {
+
+        for (uint256 i = 0; i < bounty.managers.length; i++) {
+            offeredMilestones.managersVotes[bounty.managers[i]] = 0;
+        }
+        delete offeredMilestones;
+
+        emit OfferedMilestonesDropped();
     }
 }

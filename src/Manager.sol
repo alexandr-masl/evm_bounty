@@ -10,9 +10,6 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {BountyStrategy} from "./BountyStrategy.sol";
 
 contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    struct SuppliersById {
-        mapping(address => uint256) supplyById; // Maps supplier address to their supply amount.
-    }
 
     struct BountySupply {
         uint256 need; // The total amount needed for the project.
@@ -22,8 +19,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     struct BountyInformation {
         address token;
         address executor;
-        address[] suppliers;
-        SuppliersById suppliersById;
+        address[] managers;
         BountySupply supply;
         uint256 poolId;
         address strategy;
@@ -31,14 +27,15 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         string name;
     }
 
-    bool private initialized;
-    IStrategyFactory private strategyFactory;
-
     uint8 public thresholdPercentage;
     address public strategy;
     uint256 public nonce;
 
-    mapping(bytes32 => BountyInformation) projects;
+    bool private initialized;
+    IStrategyFactory private strategyFactory;
+
+    mapping(bytes32 => BountyInformation) public bounties;
+    mapping(bytes32 => mapping(address => uint256)) public managerVotingPower;
 
     event ProjectRegistered(bytes32 profileId, uint256 nonce);
     event ProjectFunded(bytes32 indexed projectId, uint256 amount);
@@ -57,7 +54,21 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     }
 
     function getBountyStrategy(bytes32 _projectId) public view returns (address) {
-        return projects[_projectId].strategy;
+        return bounties[_projectId].strategy;
+    }
+
+    function getBounty(bytes32 _bountyId)
+    external
+    view
+    returns (BountyInformation memory) {
+        return bounties[_bountyId];
+    }
+
+    function getManagerVotingPower(bytes32 _bountyId, address _manager)
+    external
+    view
+    returns (uint256) {
+        return managerVotingPower[_bountyId][_manager];
     }
 
     function getBountyInfo(bytes32 _bountyId)
@@ -75,11 +86,11 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
             string memory _name
         )
     {
-        BountyInformation storage bounty = projects[_bountyId];
+        BountyInformation storage bounty = bounties[_bountyId];
         return (
             bounty.token,
             bounty.executor,
-            bounty.suppliers,
+            bounty.managers,
             bounty.supply.need,
             bounty.supply.has,
             bounty.poolId,
@@ -97,11 +108,11 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
         bytes32 profileId = _generateProfileId(nonce, msg.sender);
 
-        projects[profileId].token = _token;
-        projects[profileId].supply.need = _needs;
-        projects[profileId].metadata = _metadata;
-        projects[profileId].poolId = nonce;
-        projects[profileId].name = _name;
+        bounties[profileId].token = _token;
+        bounties[profileId].supply.need = _needs;
+        bounties[profileId].metadata = _metadata;
+        bounties[profileId].poolId = nonce;
+        bounties[profileId].name = _name;
 
         emit ProjectRegistered(profileId, nonce);
 
@@ -110,7 +121,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     function supplyProject(bytes32 _projectId, uint256 _amount, address _donor) external payable nonReentrant {
         require(
-            (projects[_projectId].supply.has + _amount) <= projects[_projectId].supply.need,
+            (bounties[_projectId].supply.has + _amount) <= bounties[_projectId].supply.need,
             "AMOUNT_IS_BIGGER_THAN_DECLARED_NEEDEDS"
         );
 
@@ -118,42 +129,42 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
         require(_amount > 0, "INVALID_AMOUNT");
 
-        require(projects[_projectId].strategy == address(0), "BOUNTY_IS_FULLY_FUNDED");
+        require(bounties[_projectId].strategy == address(0), "BOUNTY_IS_FULLY_FUNDED");
 
-        SafeTransferLib.safeTransferFrom(projects[_projectId].token, _donor, address(this), _amount);
+        SafeTransferLib.safeTransferFrom(bounties[_projectId].token, _donor, address(this), _amount);
 
-        projects[_projectId].supply.has += _amount;
+        bounties[_projectId].supply.has += _amount;
 
-        if (projects[_projectId].suppliersById.supplyById[msg.sender] == 0) {
-            projects[_projectId].suppliers.push(msg.sender);
+        if (managerVotingPower[_projectId][msg.sender] == 0) {
+            bounties[_projectId].managers.push(msg.sender);
         }
 
-        projects[_projectId].suppliersById.supplyById[msg.sender] += _amount;
+        managerVotingPower[_projectId][msg.sender] += _amount;
 
         emit ProjectFunded(_projectId, _amount);
 
-        if (projects[_projectId].supply.has >= projects[_projectId].supply.need) {
-            IERC20 token = IERC20(projects[_projectId].token);
+        if (bounties[_projectId].supply.has >= bounties[_projectId].supply.need) {
+            IERC20 token = IERC20(bounties[_projectId].token);
 
             require(
-                token.balanceOf(address(this)) >= projects[_projectId].supply.need,
+                token.balanceOf(address(this)) >= bounties[_projectId].supply.need,
                 "Insufficient token balance in contract"
             );
 
-            BountyStrategy.SupplierPower[] memory suppliers = _extractSupliers(_projectId);
-            address[] memory managers = new address[](suppliers.length);
+            // BountyStrategy.SupplierPower[] memory managers = _extractSupliers(_projectId);
+            // address[] memory managers = new address[](managers.length);
 
-            for (uint256 i = 0; i < suppliers.length; i++) {
-                managers[i] = (suppliers[i].supplierId);
-            }
+            // for (uint256 i = 0; i < managers.length; i++) {
+            //     managers[i] = (managers[i].supplierId);
+            // }
 
             address strategyAddress = strategyFactory.createStrategy(strategy);
 
-            projects[_projectId].strategy = strategyAddress;
+            bounties[_projectId].strategy = strategyAddress;
 
-            BountyStrategy(strategyAddress).initialize(suppliers, 1);
+            BountyStrategy(strategyAddress).initialize(address(this), _projectId);
 
-            SafeTransferLib.safeTransfer(projects[_projectId].token, strategyAddress, projects[_projectId].supply.need);
+            SafeTransferLib.safeTransfer(bounties[_projectId].token, strategyAddress, bounties[_projectId].supply.need);
 
             emit ProjectPoolCreated(_projectId);
         }
@@ -161,11 +172,11 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     function _extractSupliers(bytes32 _projectId) internal view returns (BountyStrategy.SupplierPower[] memory) {
         BountyStrategy.SupplierPower[] memory suppliersPower =
-            new BountyStrategy.SupplierPower[](projects[_projectId].suppliers.length);
+            new BountyStrategy.SupplierPower[](bounties[_projectId].managers.length);
 
-        for (uint256 i = 0; i < projects[_projectId].suppliers.length; i++) {
-            address supplierId = projects[_projectId].suppliers[i];
-            uint256 supplierPower = projects[_projectId].suppliersById.supplyById[supplierId];
+        for (uint256 i = 0; i < bounties[_projectId].managers.length; i++) {
+            address supplierId = bounties[_projectId].managers[i];
+            uint256 supplierPower = managerVotingPower[_projectId][supplierId];
 
             suppliersPower[i] = BountyStrategy.SupplierPower(supplierId, uint256(supplierPower));
         }
@@ -178,7 +189,7 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     }
 
     function _projectExists(bytes32 _profileId) private view returns (bool) {
-        BountyInformation storage bounty = projects[_profileId];
+        BountyInformation storage bounty = bounties[_profileId];
         return bounty.token != address(0);
     }
 

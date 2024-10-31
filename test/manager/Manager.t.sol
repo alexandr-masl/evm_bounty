@@ -10,6 +10,7 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 contract ManagerTest is Test {
     address deployer = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address bountyAdmin = address(0x456);
+    address bountyManager = address(0x457);
     Manager public manager;
     StrategyFactory public strategyFactory;
     BountyStrategy public bountyStrategy;
@@ -31,6 +32,7 @@ contract ManagerTest is Test {
         vm.stopPrank();
 
         bountyToken.mint(address(bountyAdmin), 2000e18);
+        bountyToken.mint(address(bountyManager), 2000e18);
     }
 
     function test_ManagerInitialized() public view {
@@ -74,6 +76,32 @@ contract ManagerTest is Test {
         emit Manager.ProjectFunded(profileId, 1e18);
 
         manager.supplyProject(profileId, 1e18, bountyAdmin);
+
+        vm.stopPrank();
+    }
+
+    function test_supplyProjectByTwoDonors() public {
+        vm.startPrank(bountyAdmin);
+
+        uint256 needs = 0.5e18;
+        string memory name = "Test Project";
+        string memory metadata = "Test Metadata";
+
+        bytes32 profileId = manager.registerProject(address(bountyToken), needs, name, metadata);
+
+        bountyToken.approve(address(manager), 1e18);
+
+        vm.expectEmit(true, true, false, true);
+        emit Manager.ProjectFunded(profileId, 0.15e18);
+
+        manager.supplyProject(profileId, 0.15e18, bountyAdmin);
+
+        vm.stopPrank();
+
+        vm.startPrank(bountyManager);
+
+        bountyToken.approve(address(manager), 1e18);
+        manager.supplyProject(profileId, 0.35e18, bountyManager);
 
         vm.stopPrank();
     }
