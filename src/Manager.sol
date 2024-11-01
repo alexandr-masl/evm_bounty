@@ -107,7 +107,6 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         external
         returns (bytes32)
     {
-
         bytes32 profileId = _generateProfileId(msg.sender);
 
         bounties[profileId].token = _token;

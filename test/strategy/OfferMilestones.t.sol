@@ -6,7 +6,6 @@ import {BountyStrategy} from "../../src/BountyStrategy.sol";
 import {TestSetUp} from "../tesSetUp/TestSetUp.sol";
 
 contract OfferMilestones is TestSetUp {
-
     function setUp() public override {
         super.setUp();
     }

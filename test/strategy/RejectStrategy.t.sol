@@ -5,7 +5,6 @@ import {TestSetUp} from "../tesSetUp/TestSetUp.sol";
 import {BountyStrategy} from "../../src/BountyStrategy.sol";
 
 contract OfferMilestones is TestSetUp {
-
     BountyStrategy.Milestone milestones;
 
     function setUp() public override {
