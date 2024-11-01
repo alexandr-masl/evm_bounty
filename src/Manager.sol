@@ -107,9 +107,8 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         external
         returns (bytes32)
     {
-        nonce++;
 
-        bytes32 profileId = _generateProfileId(nonce, msg.sender);
+        bytes32 profileId = _generateProfileId(msg.sender);
 
         bounties[profileId].token = _token;
         bounties[profileId].supply.need = _needs;
@@ -232,8 +231,8 @@ contract Manager is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         return suppliersPower;
     }
 
-    function _generateProfileId(uint256 _nonce, address _owner) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_nonce, _owner));
+    function _generateProfileId(address _owner) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(_owner, block.timestamp, block.prevrandao));
     }
 
     function _projectExists(bytes32 _profileId) private view returns (bool) {

@@ -134,7 +134,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         strategyStorage.state = StrategyState.Active;
     }
 
-    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive {
+    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive() {
         for (uint256 i = 0; i < _milestones.length; i++) {
             offeredMilestones.milestones.push(_milestones[i]);
         }
@@ -148,7 +148,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     /// @param _status The new status to be set for the offered milestones.
     /// @dev Requires the sender to be the pool manager and wearing the supplier hat.
     /// Emits a MilestonesReviewed event and, depending on the outcome, either OfferedMilestonesAccepted or OfferedMilestonesRejected.
-    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) onlyActive {
+    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) onlyActive() {
         require(offeredMilestones.managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
         require(milestones.length == 0, "MILESTONES_ALREADY_SET");
 
@@ -174,8 +174,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         emit MilestonesReviewed(_status);
     }
 
-    function rejectStrategy(Status _status) external onlyRole(DONOR_ROLE) onlyActive {
-        require(_status == Status.Accepted || _status == Status.Rejected, "INVALID_STATUS");
+    function rejectStrategy() external onlyRole(DONOR_ROLE) onlyActive() {
         require(rejectStrategyVotes.donorVotes[msg.sender] == 0, "ALREADY_REVIEWED");
 
         uint256 donorContributionFraction = _donorContributionFraction[msg.sender];
@@ -238,12 +237,12 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     }
 
     function _distributeFundsBackToDonors() private {
-        for (uint256 i = 0; i < bounty.donors.length; i++) {
-            uint256 fraction = _donorContributionFraction[msg.sender];
-            IERC20 token = IERC20(bounty.token);
-            uint256 tokenBalance = token.balanceOf(address(this));
-            uint256 amount = tokenBalance * fraction / 1e18;
+        IERC20 token = IERC20(bounty.token);
+        uint256 tokenBalance = token.balanceOf(address(this));
 
+        for (uint256 i = 0; i < bounty.donors.length; i++) {
+            uint256 fraction = _donorContributionFraction[bounty.donors[i]];
+            uint256 amount = tokenBalance * fraction / 1e18;
             SafeTransferLib.safeTransfer(bounty.token, bounty.donors[i], amount);
         }
     }
