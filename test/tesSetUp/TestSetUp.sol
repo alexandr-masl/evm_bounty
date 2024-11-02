@@ -13,6 +13,7 @@ contract TestSetUp is Test {
     address unAuthorized = address(0x455);
     address bountyDonor = address(0x458);
     address bountyDonor2 = address(0x454);
+    address bountyHunter = address(0x453);
     Manager public manager;
     StrategyFactory public strategyFactory;
     BountyStrategy public bountyStrategy;

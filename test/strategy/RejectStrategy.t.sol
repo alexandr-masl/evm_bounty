@@ -11,77 +11,77 @@ contract OfferMilestones is TestSetUp {
         super.setUp();
     }
 
-    // function test_UnAuthorizedRejectStrategyByManager() public {
-    //     vm.startPrank(bountyManager);
+    function test_UnAuthorizedRejectStrategyByManager() public {
+        vm.startPrank(bountyManager);
 
-    //     bountyToken.approve(address(manager), 100e18);
-    //     manager.supplyProject(profileId, 1e18, bountyDonor);
+        bountyToken.approve(address(manager), 100e18);
+        manager.supplyProject(profileId, 1e18, bountyDonor);
 
-    //     address projectStrategy = manager.getBountyStrategy(profileId);
-    //     BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
+        address projectStrategy = manager.getBountyStrategy(profileId);
+        BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
 
-    //     bytes memory expectedError = abi.encodeWithSignature(
-    //         "AccessControlUnauthorizedAccount(address,bytes32)",
-    //         bountyManager,
-    //         strategyContract.DONOR_ROLE() // Assumes `SUPPLIER_ROLE` is accessible
-    //     );
+        bytes memory expectedError = abi.encodeWithSignature(
+            "AccessControlUnauthorizedAccount(address,bytes32)",
+            bountyManager,
+            strategyContract.DONOR_ROLE() // Assumes `SUPPLIER_ROLE` is accessible
+        );
 
-    //     vm.expectRevert(expectedError);
-    //     strategyContract.rejectStrategy();
+        vm.expectRevert(expectedError);
+        strategyContract.rejectStrategy();
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
-    // function test_RejectStrategyByManager() public {
-    //     vm.startPrank(bountyManager);
+    function test_RejectStrategyByManager() public {
+        vm.startPrank(bountyManager);
 
-    //     bountyToken.approve(address(manager), 100e18);
-    //     manager.supplyProject(profileId, 1e18, bountyManager);
+        bountyToken.approve(address(manager), 100e18);
+        manager.supplyProject(profileId, 1e18, bountyManager);
 
-    //     address projectStrategy = manager.getBountyStrategy(profileId);
-    //     BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
+        address projectStrategy = manager.getBountyStrategy(profileId);
+        BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
 
-    //     strategyContract.rejectStrategy();
+        strategyContract.rejectStrategy();
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
-    // function test_RejectStrategyByDonor() public {
-    //     vm.startPrank(bountyManager);
+    function test_RejectStrategyByDonor() public {
+        vm.startPrank(bountyManager);
 
-    //     bountyToken.approve(address(manager), 100e18);
-    //     manager.supplyProject(profileId, 1e18, bountyDonor);
+        bountyToken.approve(address(manager), 100e18);
+        manager.supplyProject(profileId, 1e18, bountyDonor);
 
-    //     vm.stopPrank();
+        vm.stopPrank();
 
-    //     address projectStrategy = manager.getBountyStrategy(profileId);
-    //     BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
+        address projectStrategy = manager.getBountyStrategy(profileId);
+        BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
 
-    //     vm.prank(bountyDonor);
-    //     strategyContract.rejectStrategy();
-    // }
+        vm.prank(bountyDonor);
+        strategyContract.rejectStrategy();
+    }
 
-    // function test_RejectStrategyByMajorityVotes() public {
-    //     vm.startPrank(bountyManager);
+    function test_RejectStrategyByMajorityVotes() public {
+        vm.startPrank(bountyManager);
 
-    //     bountyToken.approve(address(manager), 100e18);
+        bountyToken.approve(address(manager), 100e18);
 
-    //     manager.supplyProject(profileId, 0.85e18, bountyDonor);
+        manager.supplyProject(profileId, 0.85e18, bountyDonor);
 
-    //     manager.supplyProject(profileId, 0.15e18, bountyDonor2);
+        manager.supplyProject(profileId, 0.15e18, bountyDonor2);
 
-    //     vm.stopPrank();
+        vm.stopPrank();
 
-    //     address projectStrategy = manager.getBountyStrategy(profileId);
-    //     BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
+        address projectStrategy = manager.getBountyStrategy(profileId);
+        BountyStrategy strategyContract = BountyStrategy(payable(projectStrategy));
 
-    //     vm.prank(bountyDonor);
-    //     strategyContract.rejectStrategy();
+        vm.prank(bountyDonor);
+        strategyContract.rejectStrategy();
 
-    //     vm.expectRevert(bytes("ACTIVE_STATE_REQUIERED"));
-    //     vm.prank(bountyManager);
-    //     strategyContract.reviewOfferedtMilestones(BountyStrategy.Status.Accepted);
-    // }
+        vm.expectRevert(bytes("ACTIVE_STATE_REQUIERED"));
+        vm.prank(bountyManager);
+        strategyContract.reviewOfferedtMilestones(BountyStrategy.Status.Accepted);
+    }
 
     function test_RejectStrategyByMinorityVotes() public {
         vm.startPrank(bountyManager);
