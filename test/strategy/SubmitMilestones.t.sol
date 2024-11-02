@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 import {TestSetUp} from "../tesSetUp/TestSetUp.sol";
 import {BountyStrategy} from "../../src/BountyStrategy.sol";
 
-contract OfferRecipient is TestSetUp { 
-
+contract OfferRecipient is TestSetUp {
     function setUp() public override {
         super.setUp();
     }

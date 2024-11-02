@@ -84,7 +84,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     event OfferedMilestonesDropped();
     event ProjectRejected();
     event MilestoneSubmitted(uint256 milestoneId, string _metadata);
-    event Distributed(uint256 milestoneId, address hunter,uint256  amountToDistributed);
+    event Distributed(uint256 milestoneId, address hunter, uint256 amountToDistributed);
     event MilestoneStatusChanged(uint256 milestoneId, Status status);
     event SubmittedMilestoneReviewed(uint256 milestoneId, Status status);
 
@@ -156,7 +156,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         strategyStorage.state = StrategyState.Active;
     }
 
-    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive() {
+    function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive {
         for (uint256 i = 0; i < _milestones.length; i++) {
             offeredMilestones.milestones.push(_milestones[i]);
         }
@@ -170,7 +170,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     /// @param _status The new status to be set for the offered milestones.
     /// @dev Requires the sender to be the pool manager and wearing the supplier hat.
     /// Emits a MilestonesReviewed event and, depending on the outcome, either OfferedMilestonesAccepted or OfferedMilestonesRejected.
-    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) onlyActive() {
+    function reviewOfferedtMilestones(Status _status) public onlyRole(MANAGER_ROLE) onlyActive {
         require(offeredMilestones.managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
         require(milestones.length == 0, "MILESTONES_ALREADY_SET");
 
@@ -211,29 +211,16 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         }
     }
 
-    function reviewRecipient(address _recipient, Status _status) external onlyRole(MANAGER_ROLE) onlyActive() {
+    function reviewRecipient(address _recipient, Status _status) external onlyRole(MANAGER_ROLE) onlyActive {
         if (_status == Status.Accepted) {
-            require(
-                strategyStorage.hunter == address(0),
-                "MAX_RECIPIENTS_AMOUNT_REACHED"
-            );
+            require(strategyStorage.hunter == address(0), "MAX_RECIPIENTS_AMOUNT_REACHED");
+        } else {
+            require(strategyStorage.hunter != address(0), "INVALID_HUNTER");
         }
-        else {
-            require(
-                strategyStorage.hunter != address(0),
-                "INVALID_HUNTER"
-            );
-        }
-        
-        require(
-            offeredRecipient[_recipient].managersVotes[msg.sender] == 0,
-            "ALREADY_REVIEWED"
-        );
 
-        require(
-            _status == Status.Accepted || _status == Status.Rejected,
-            "INVALID STATUS"
-        );
+        require(offeredRecipient[_recipient].managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
+
+        require(_status == Status.Accepted || _status == Status.Rejected, "INVALID STATUS");
 
         uint256 managerVotingPower = manager.getManagerVotingPower(bountyId, msg.sender);
         offeredRecipient[_recipient].managersVotes[msg.sender] = managerVotingPower;
@@ -247,8 +234,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
 
                 _grantRole(HUNTER_ROLE, _recipient);
             }
-        }
-        else {
+        } else {
             offeredRecipient[_recipient].votesAgainst += managerVotingPower;
 
             if (_checkIfVotesExceedThreshold(offeredRecipient[_recipient].votesAgainst)) {
@@ -261,7 +247,6 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     }
 
     function submitMilestone(uint256 _milestoneId, string calldata _metadata) external {
-
         require(_milestoneId < milestones.length, "INVALID_MILESTONE");
 
         Milestone storage milestone = milestones[_milestoneId];
@@ -269,26 +254,18 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         require(milestone.milestoneStatus != Status.Accepted, "MILESTONE_ALREADY_ACCEPTED");
 
         if (hasRole(HUNTER_ROLE, msg.sender)) {
-            _submitMilestone( _milestoneId, milestone, _metadata);
-        } 
-        else if (hasRole(MANAGER_ROLE, msg.sender)) {
-            _submitMilestone( _milestoneId, milestone, _metadata);
+            _submitMilestone(_milestoneId, milestone, _metadata);
+        } else if (hasRole(MANAGER_ROLE, msg.sender)) {
+            _submitMilestone(_milestoneId, milestone, _metadata);
 
             reviewSubmitedMilestone(_milestoneId, Status.Accepted);
-        } 
-        else {
+        } else {
             revert UNAUTHORIZED();
         }
     }
 
-    function reviewSubmitedMilestone(uint256 _milestoneId, Status _status)
-        public
-        onlyRole(MANAGER_ROLE)
-    {
-        require(
-            submittedvMilestones[_milestoneId].managersVotes[msg.sender] == 0,
-            "ALREADY_REVIEWED"
-        );
+    function reviewSubmitedMilestone(uint256 _milestoneId, Status _status) public onlyRole(MANAGER_ROLE) {
+        require(submittedvMilestones[_milestoneId].managersVotes[msg.sender] == 0, "ALREADY_REVIEWED");
 
         require(_milestoneId < milestones.length, "INVALID_MILESTONE");
 
@@ -296,10 +273,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
 
         require(milestone.milestoneStatus == Status.Pending, "INVALID_MILESTONE_STATUS");
 
-        require(
-            _status == Status.Accepted || _status == Status.Rejected,
-            "INVALID STATUS"
-        );
+        require(_status == Status.Accepted || _status == Status.Rejected, "INVALID STATUS");
 
         uint256 managerVotingPower = manager.getManagerVotingPower(bountyId, msg.sender);
         submittedvMilestones[_milestoneId].managersVotes[msg.sender] = managerVotingPower;
@@ -308,14 +282,12 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
             submittedvMilestones[_milestoneId].votesFor += managerVotingPower;
 
             if (_checkIfVotesExceedThreshold(submittedvMilestones[_milestoneId].votesFor)) {
-
                 milestone.milestoneStatus = _status;
                 emit MilestoneStatusChanged(_milestoneId, _status);
 
                 _distributeMilestone(_milestoneId);
             }
-        } 
-        else {
+        } else {
             submittedvMilestones[_milestoneId].votesAgainst += managerVotingPower;
 
             if (_checkIfVotesExceedThreshold(submittedvMilestones[_milestoneId].votesAgainst)) {
@@ -332,7 +304,6 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
     }
 
     function _distributeMilestone(uint256 _milestoneId) private {
-
         Milestone storage milestone = milestones[_milestoneId];
 
         require(milestone.milestoneStatus == Status.Accepted, "INVALID_MILESTONE_STATUS");
@@ -350,11 +321,7 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         emit Distributed(_milestoneId, strategyStorage.hunter, amountToDistribute);
     }
 
-    function _submitMilestone(
-        uint256 _milestoneId,
-        Milestone storage milestone,
-        string calldata _metadata
-    ) internal {
+    function _submitMilestone(uint256 _milestoneId, Milestone storage milestone, string calldata _metadata) internal {
         for (uint256 i = 0; i < bounty.managers.length; i++) {
             submittedvMilestones[_milestoneId].managersVotes[bounty.managers[i]] = 0;
         }
