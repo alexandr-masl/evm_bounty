@@ -14,6 +14,7 @@ contract TestSetUp is Test {
     address bountyDonor = address(0x458);
     address bountyDonor2 = address(0x454);
     address bountyHunter = address(0x453);
+    address bountyHunter2 = address(0x452);
     Manager public manager;
     StrategyFactory public strategyFactory;
     BountyStrategy public bountyStrategy;
