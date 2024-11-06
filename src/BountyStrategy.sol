@@ -156,6 +156,26 @@ contract BountyStrategy is ReentrancyGuard, AccessControl {
         strategyStorage.state = StrategyState.Active;
     }
 
+    function getBountyStrategyInfo()
+        external
+        view
+        returns (
+            StrategyState _state,
+            uint32 _maxRecipientsAmount,
+            uint256 _totalSupply,
+            uint256 _thresholdPercentage,
+            address _hunter
+        )
+    {
+        return (
+            strategyStorage.state,
+            strategyStorage.maxRecipientsAmount,
+            strategyStorage.totalSupply,
+            strategyStorage.thresholdPercentage,
+            strategyStorage.hunter
+        );
+    }
+
     function offerMilestones(Milestone[] memory _milestones) external onlyRole(MANAGER_ROLE) onlyActive {
         for (uint256 i = 0; i < _milestones.length; i++) {
             offeredMilestones.milestones.push(_milestones[i]);
