@@ -1,4 +1,4 @@
-# Bounty Machine
+# Bounty Strategy
 
 Designed to manage any milestone-based funding logic, including bounties and crowdfunding. 
 Essentially, it functions like a traditional paper contract but leverages key Web3 benefits such as automation, security, transparent voting, and flexible task delegation. All funds distribution events in the strategy are driven by a committee voting process, ensuring accountability.
