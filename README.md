@@ -26,7 +26,15 @@ The strategy incorporates three main roles: **Donor**, **Manager**, and **Hunter
 
     For example, the parameters might look like this: `(0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9, 7, "Test Project", "https://github.com/alexandr-masl/evm_bounty")`. Upon successful registration, the contract will add the project and return a project ID (in `bytes32` format), which will be used for all subsequent interactions with the project.
 
-- ## Project Funding:
+- ### Project Funding:
+
+    This phase involves funding the project. A supporter can contribute by calling the [`supplyProject`](https://github.com/alexandr-masl/evm_bounty/blob/e95ed7b71214bfe14a134a056e3bed22ee5d1020/src/Manager.sol#L123) function on the Manager contract, providing the following parameters: `bytes32 _projectId`, `uint256 _amount`, and `address _donor`. These represent the project ID, the amount of project tokens to contribute, and the donor address, respectively.
+
+    If the contributor wishes to manage all processes personally, they specify their own address as the donor. Alternatively, if they prefer to delegate voting rights, they can approve the contribution amount for a bot (or another representative), which will fund the project on their behalf and set the donor’s address of the sponsor. In this case, the bot will have voting rights, while the donor retains the ability to withdraw their funds at any time.
+
+    The account that calls the `supplyProject` function is assigned the **`Manager`** role, while the _donor address is assigned the **`Donor`** role. An account can hold both roles if it designates its own wallet as the donor. Alternatively, if the account delegates, it retains only the `Donor` role, while the delegated entity assumes the `Manager` role.
+
+    A project can be fully funded, granting 100% voting power to the contributor, or it can be partially funded. For example, if a contributor funds 30% of the project's required amount, they will receive 30% voting power, proportional to their contribution relative to the project's total funding requirement
 
 
 
