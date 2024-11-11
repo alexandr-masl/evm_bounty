@@ -72,6 +72,23 @@ Once the project is fully funded, the Manager contract creates a clone of the St
 
     The manager proposing the milestones votes on them when calling the function. If there are additional managers, they can also vote on the milestones by calling [`reviewOfferedtMilestones`](https://github.com/alexandr-masl/evm_bounty/blob/8197111be3aadfbcd2d0ed063ed49496372b3dd8/src/BountyStrategy.sol#L193). If the vote meets the required threshold, the milestones are added to the strategy. If the voting fails, the milestones are rejected, and the process begins again.
 
+- ### Adding Recipient:
+
+    Once the milestones are set and the project has a clear plan, any wallet can be proposed as a funds recipient by calling the [`reviewRecipient`](https://github.com/alexandr-masl/evm_bounty/blob/f6cc3a8d1db0b7d6d676ff1e7044e05076dba3ec/src/BountyStrategy.sol#L234) function, providing the recipient’s address and voting `status`. This function can only be called by a Manager. If the recipient gains enough votes to meet the threshold, they are added to the strategy as an approved recipient.
+
+
+- ### Submitting Milestone:
+
+    The final step in a successful strategy is milestone submission. Once the work is complete, the recipient submits it by calling the [`submitMilestone`](https://github.com/alexandr-masl/evm_bounty/blob/f6cc3a8d1db0b7d6d676ff1e7044e05076dba3ec/src/BountyStrategy.sol#L269) function, passing the milestone ID (`_milestoneId`) and a link or pointer (`_metadata`) that validates their work. Alternatively, the manager can submit the milestone on behalf of the recipient, such as when a bot manages the strategy.
+
+    If the milestone is submitted by the recipient, managers review it by calling the [`reviewSubmittedMilestone`](https://github.com/alexandr-masl/evm_bounty/blob/f6cc3a8d1db0b7d6d676ff1e7044e05076dba3ec/src/BountyStrategy.sol#L287) function, providing the milestone ID and their voting status. If the milestone was submitted by the manager, it is reviewed in the same call, consolidating the submission and review process.
+
+    If the milestone receives enough votes to meet the threshold, the funds allocated for this milestone are distributed to the recipient's address.
+
+- ### Rejecting Strategy:
+
+   Donors can choose to reject the strategy and reclaim their funds at any point, whether due to lack of progress or for any other reason, by calling the [`rejectStrategy`](https://github.com/alexandr-masl/evm_bounty/blob/f6cc3a8d1db0b7d6d676ff1e7044e05076dba3ec/src/BountyStrategy.sol#L219) function. If the rejection vote meets the required threshold, the strategy is terminated, and all remaining funds are returned to donors in proportion to their contributions.
+
 
 ### Build
 
