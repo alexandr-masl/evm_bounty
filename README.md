@@ -18,6 +18,18 @@ The strategy incorporates three main roles: **Donor**, **Manager**, and **Hunter
 - **Strategy Rejection:** At any point, if the project shows no progress, Donors can reject the strategy, sending funds back to contributors.
 
 
+## Overview of Main Process Phases
+
+- **Project Creation:**
+
+This phase involves interactions with [the Manager contract](https://github.com/alexandr-masl/evm_bounty/blob/main/src/Manager.sol). Any user can create a project by calling the [`registerProject`](https://github.com/alexandr-masl/evm_bounty/blob/e95ed7b71214bfe14a134a056e3bed22ee5d1020/src/Manager.sol#L106) function on the Manager contract with the following parameters: `address _token`, `uint256 _needs`, `string _name`, and `string _metadata`. These parameters represent the project token, the required funding amount, the project name, and metadata (such as a URL) pointing to the project details. 
+
+For example, the parameters might look like this: `(0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9, 7, "Test Project", "https://github.com/alexandr-masl/evm_bounty")`. Upon successful registration, the contract will add the project and return a project ID (in `bytes32` format), which will be used for all subsequent interactions with the project."
+
+
+
+
+
 ### Build
 
 ```shell
